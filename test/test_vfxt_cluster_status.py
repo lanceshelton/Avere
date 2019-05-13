@@ -95,10 +95,27 @@ class TestVfxtSupport:
     These tests should attempt to run even if deployment has failed.
     """
 
-    def test_for_cores(self, averecmd_params):  # noqa: F811
-        """
-        Check the cluster for cores. If a core is found, collect/send a GSI.
-        """
+    def test_for_alerts_active(self, averecmd_params, test_vars):  # noqa: F811
+        """Check the cluster for active conditions and events."""
+        log = logging.getLogger("test_for_alerts_active")
+        conditions = run_averecmd(
+            **averecmd_params, method="alert.conditions", args="yellow"
+        )
+        if conditions:
+            test_vars["collect_gsi"] = True
+            log.error('Active "yellow+" conditions: {}'.format(conditions))
+
+        events = run_averecmd(
+            **averecmd_params, method="alert.events", args="yellow"
+        )
+        if events:
+            test_vars["collect_gsi"] = True
+            log.error('Active "yellow+" events: {}'.format(events))
+
+        assert(not conditions and not events)
+
+    def test_for_cores(self, averecmd_params, test_vars):  # noqa: F811
+        """Check the cluster for cores."""
         log = logging.getLogger("test_for_cores")
         node_cores = run_averecmd(
             **averecmd_params, method="support.listCores", args="cluster"
@@ -110,10 +127,17 @@ class TestVfxtSupport:
                 break
 
         if cores_found:
+            test_vars["collect_gsi"] = True
             log.error("Cores found: {}".format(node_cores))
-            upload_gsi(averecmd_params)  # collect/upload a "normal" GSI bundle
 
         assert(not cores_found)
+
+    def test_collect_gsi(self, averecmd_params, test_vars):  # noqa: F811
+        """Collect/upload a GSI if another test requested it."""
+        if "collect_gsi" in test_vars:
+            if test_vars["collect_gsi"]:
+                upload_gsi(averecmd_params)  # collect/upload a "normal" GSI
+            test_vars.pop("collect_gsi")
 
     def test_artifacts_collect(self, averecmd_params, node_names, scp_con, test_vars):  # noqa: F811, E501
         """
