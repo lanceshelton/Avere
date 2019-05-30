@@ -5,8 +5,10 @@
 """vFXT cluster health status checks."""
 
 # standard imports
+import json
 import logging
 import os
+import re
 import sys
 from time import sleep, time
 
@@ -113,6 +115,68 @@ class TestVfxtSupport:
             log.error('Active "yellow+" events: {}'.format(events))
 
         assert(not conditions and not events)
+
+    def test_for_alerts_past(self, averecmd_params, test_vars):  # noqa: F811
+        """Check the cluster for historical conditions and events."""
+        log = logging.getLogger("test_for_alerts_past")
+        alerts = (run_averecmd(**averecmd_params, method="alert.history") +
+                  run_averecmd(**averecmd_params, method="alert.getHistory"))
+
+        msgs_to_ignore = [
+            r"are being rebalanced.\s+The vserver\(s\) will be suspended until the rebalance is complete.",
+            r"HA is now fully configured",
+            r"is checking for data to flush that was not mirrored. Check cluster activity for progress",
+            r"is initializing.\s+Access is suspended for this node.",
+            r"joined the cluster.",
+            r"New caching policy: Full Caching {read-write, writeback time: \d+, attribute checking: never, nlm caching: \d}",
+            r"that is configured for HA is currently running in write-through mode without an assigned partner node. This situation can be caused by HA reconfiguration, cluster reconfiguration, or an internal error.",
+            r"that is configured for HA is unable to communicate with its HA partner node",
+            r"The caching policy for core filer msazure has been modified",
+            r"Vserver.+vserver.+is having a problem on some of the nodes in the cluster. All affected interfaces have been failed over.",
+        ]
+
+        alerts_without_matches = []
+        for alert in alerts:
+            exp_msg_found = False
+            for ignore_msg in msgs_to_ignore:
+                for field in ["message", "details", "xmldescription"]:
+                    if field in alert and re.search(ignore_msg, alert[field]):
+                        log.debug("Ignorable message found: ".format(alert))
+                        exp_msg_found = True
+                        break  # out of field loop
+                if exp_msg_found:
+                    break  # out of ignore_msg loop
+            if not exp_msg_found:
+                alerts_without_matches.append(alert)
+
+        log.error("Alerts without ignorable messages ({0} found): {1}".format(
+            len(alerts_without_matches),
+            json.dumps(alerts_without_matches, indent=4)
+        ))
+
+        ###############################################################################
+        msgs_without_matches = set()
+        for alert in alerts_without_matches:
+            if "message" in alert and "details" in alert:
+                msgs_without_matches.add("message: {0}\n\ndetails:{1}".format(
+                    alert["message"].replace("\n", r"\n"),
+                    alert["details"].replace("\n", r"\n")))
+            elif "message" in alert:
+                msgs_without_matches.add(alert["message"].replace("\n", r"\n"))
+            elif "details" in alert:
+                msgs_without_matches.add(alert["details"].replace("\n", r"\n"))
+            elif "xmldescription" in alert:
+                msgs_without_matches.add(alert["xmldescription"].replace("\n", r"\n"))
+        mwm = sorted(list(set(msgs_without_matches)))
+        log.error("messages without matches ({}):\n".format(
+            len(mwm)) + ("\n" + ("="*40) + "\n") .join(mwm)
+        )
+        ###############################################################################
+
+        if alerts_without_matches:
+            test_vars["collect_gsi"] = True
+
+        assert(not alerts_without_matches)
 
     def test_for_cores(self, averecmd_params, test_vars):  # noqa: F811
         """Check the cluster for cores."""
