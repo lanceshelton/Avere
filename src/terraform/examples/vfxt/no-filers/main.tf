@@ -91,7 +91,7 @@ module "vfxtcontroller" {
   virtual_network_subnet_name    = module.network.jumpbox_subnet_name
 
   depends_on = [
-    module.network,
+    module.network.vnet_id,
   ]
 
   tags = local.tags
