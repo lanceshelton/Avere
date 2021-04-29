@@ -168,7 +168,7 @@ module "vfxtcontroller" {
   virtual_network_subnet_name    = module.network.jumpbox_subnet_name
 
   depends_on = [
-    module.network,
+    module.network.jumpbox_subnet_id
   ]
 }
 
@@ -211,7 +211,7 @@ resource "avere_vfxt" "vfxt" {
   }
 
   // terraform is not creating the implicit dependency on the controller module
-  // otherwise during destroy, it tries to destroy the controller and proxy at the 
+  // otherwise during destroy, it tries to destroy the controller and proxy at the
   // same time as vfxt cluster to work around, add the explicit dependencies
   depends_on = [
     module.vfxtcontroller,
