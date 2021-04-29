@@ -180,6 +180,14 @@ resource "avere_vfxt" "vfxt" {
   controller_admin_password = local.vm_ssh_key_data != null && local.vm_ssh_key_data != "" ? "" : local.vm_admin_password
   controller_ssh_port       = local.ssh_port
 
+  // terraform is not creating the implicit dependency on the controller module
+  // otherwise during destroy, it tries to destroy the controller and proxy at the
+  // same time as vfxt cluster to work around, add the explicit dependencies
+  depends_on = [
+    module.vfxtcontroller,
+    module.proxy,
+  ]
+
   location                     = local.location
   azure_resource_group         = local.vfxt_resource_group_name
   azure_network_resource_group = local.network_resource_group_name
@@ -210,13 +218,7 @@ resource "avere_vfxt" "vfxt" {
     }
   }
 
-  // terraform is not creating the implicit dependency on the controller module
-  // otherwise during destroy, it tries to destroy the controller and proxy at the
-  // same time as vfxt cluster to work around, add the explicit dependencies
-  depends_on = [
-    module.vfxtcontroller,
-    module.proxy,
-  ]
+
 }
 
 output "controller_username" {
