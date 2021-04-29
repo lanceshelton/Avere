@@ -2,6 +2,7 @@ data "azurerm_subnet" "vnet" {
   name                 = var.virtual_network_subnet_name
   virtual_network_name = var.virtual_network_name
   resource_group_name  = var.virtual_network_resource_group
+  depends_on = [var.module_depends_on]
 }
 
 data "azurerm_resource_group" "nfsfiler" {
@@ -26,6 +27,7 @@ resource "azurerm_network_interface" "nfsfiler" {
     private_ip_address_allocation = var.private_ip_address != null ? "Static" : "Dynamic"
     private_ip_address            = var.private_ip_address != null ? var.private_ip_address : null
   }
+  depends_on = [var.module_depends_on]
 }
 
 resource "azurerm_linux_virtual_machine" "nfsfiler" {
@@ -36,7 +38,7 @@ resource "azurerm_linux_virtual_machine" "nfsfiler" {
   computer_name  = var.unique_name
   custom_data = base64encode(local.cloud_init_file)
   size = var.vm_size
-  
+
   os_disk {
     name              = "${var.unique_name}-osdisk"
     caching           = "ReadWrite"
@@ -60,4 +62,5 @@ resource "azurerm_linux_virtual_machine" "nfsfiler" {
           public_key = var.ssh_key_data
       }
   }
+  depends_on = [var.module_depends_on]
 }
